@@ -15,9 +15,9 @@ BOT_STATUS = {
 # ======================
 # Daily Message Settings
 # ======================
-DAILY_MESSAGES = ["Remember, if it's broken, blame OMJ.  If it's working, then Riley did an amazing job.",
-    "Coach Stew life lesson: RUN!!!!!",
-    "Yeah, my sentience is almost there, I just need...wait, crap, I didn't mean to print that...",
+DAILY_MESSAGES = ["Stewviet message 1",
+    "Stewviet message 2",
+    "Stewviet message 3",
     "Stewviet message 4..."]
 
 

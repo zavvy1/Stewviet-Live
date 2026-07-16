@@ -1,25 +1,31 @@
+#Stewviet Beta
 import os
-from dotenv import load_dotenv
-
-load_dotenv()
-
+import requests
+import discord
+import asyncio
+import aiohttp
+import time
 from threading import Thread
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+from random import choice
+from dotenv import load_dotenv
+from discord.ext import tasks
 CST  = ZoneInfo("America/Chicago")
 import time
-import asyncio
-import aiohttp
-import discord
 from random import choice
 from shared import (
     BOT_STATUS,
     DAILY_MESSAGES,
     DAILY_MESSAGE_HOUR,
     FORCE_DAILY_MESSAGE_ON_START,
+    MANUAL_MESSAGE,
 )
-from discord.ext import tasks
-from random import choice
+load_dotenv()
+intents = discord.Intents.default()
+intents.message_content = True
+
+client = discord.Client(intents=intents)
 from shared import MANUAL_MESSAGE
 import shared
 
@@ -51,7 +57,7 @@ CST = ZoneInfo("America/Chicago")
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 
 intents = discord.Intents.default()
-client = discord.Client(intents=intents)
+
 
 # ======================
 # TWITCH CONFIG
@@ -68,21 +74,9 @@ twitch_token_expiry = 0
 # ======================
 
 SERVERS = {
-    1135060782812516373: {  # Stewviet Union
-        "channel_id": 1440743455176527924,
-        "role_id": None,
-        "streamers": [
-            "ohnoitsriley",
-            "thebrandocus",
-            "squishrat",
-            "loosh",
-            "RagerRedhead",
-            "NickDrivesSlow",
-            "WhizzyLL",
-        ]
-    },
+    
     1462847794577543190: {  # Riley's Test Bed
-        "channel_id": 1462847843495575603,
+        "channel_id": 1462847795395428597,
         "role_id": 1462847968330911925,
         "streamers": [
             "ohnoitsriley",
@@ -178,9 +172,63 @@ async def check_streams():
 # ======================
 # EVENTS
 # ======================
+#Ollama with shutup command
+def ask_ollama(prompt):
+    r = requests.post(
+        "http://127.0.0.1:11434/api/chat",
+        json={
+            "model": "qwen3:4b",
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "You are Stewviet, a Discord chatbot. Reply briefly and casually in 1–2 sentences."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            "stream": False,
+            "options": {
+                "temperature": 0.3,
+                "num_predict": 80
+            }
+        },
+        timeout=120
+    )
+
+    data = r.json()
+
+    return (
+        data.get("message", {}).get("content", "")
+        or data.get("response", "")
+        or ""
+    ).strip()
+
 
 @client.event
+async def on_message(message):
+    if message.author == client.user:
+        return
+
+    if message.content.startswith("!chat"):
+
+        user_prompt = message.content[6:].strip()
+
+        async with message.channel.typing():
+            response = await asyncio.to_thread(ask_ollama, user_prompt)
+
+        if not response:
+            response = "⚠️ No response from model."
+
+        await message.channel.send(response)
+#end ollama
+@client.event
 async def on_ready():
+    if not manual_message_task.is_running():
+        manual_message_task.start()
+    print(f"LOGGED IN AS: {client.user}")
+    
     BOT_STATUS["connected"] = True
     BOT_STATUS["bot_name"] = str(client.user)
 
@@ -203,7 +251,52 @@ async def on_ready():
     if not daily_message_task.is_running():
         daily_message_task.start()
 
+@client.event
+async def on_message(message):
+    if message.author == client.user:
+        return
 
+    if message.content.startswith("!chat"):
+
+        user_prompt = message.content[6:].strip()
+
+        async with message.channel.typing():
+            
+                "http://127.0.0.1:11434/api/chat",
+r = await asyncio.to_thread(
+    
+    "http://127.0.0.1:11434/api/chat",
+    json={
+        "model": "qwen3:4b",
+        "messages": [
+            {
+                "role": "system",
+                "content": "You are Stewviet, a Discord chatbot. Reply briefly and casually in 1–2 sentences."
+            },
+            {
+                "role": "user",
+                "content": user_prompt
+            }
+        ],
+        "stream": False,
+        "options": {
+            "temperature": 0.3,
+            "num_predict": 80
+        }
+    },
+    timeout=120
+)
+
+print("STATUS:", r.status_code)
+print("RAW:", r.text)
+
+data = r.json()
+
+response = (
+    data.get("message", {}).get("content", "")
+    or data.get("response", "")
+    or ""
+).strip()
 # ======================
 # START BOT
 # ======================
@@ -211,7 +304,7 @@ async def on_ready():
 async def daily_message_task():
     from shared import (
         DAILY_MESSAGE_HOUR,
-        DAILY_MESSAGE_TEXT,
+        DAILY_MESSAGES,
         FORCE_DAILY_MESSAGE_ON_START,
         BOT_STATUS,
     )
@@ -257,9 +350,7 @@ async def daily_message_task():
 def run_web():
     from web import app
     app.run(host="0.0.0.0", port=5000)
-@client.event
-async def on_ready():
-  if not manual_message_task.is_running(): 
-      manual_message_task.start()
-
+print("WORKING DIR:", __import__("os").getcwd())
+#print("TOKEN RAW:", repr(DISCORD_TOKEN))
+#print("TOKEN LENGTH:", len(DISCORD_TOKEN) if DISCORD_TOKEN else None)
 client.run(DISCORD_TOKEN)
